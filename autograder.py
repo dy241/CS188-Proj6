@@ -302,7 +302,7 @@ def trace_node(node_to_trace):
 
     return nodes
 
-@test('q1', points=6)
+@test('q1', points=5)
 def check_perceptron(tracker):
     import models
 
@@ -402,9 +402,131 @@ def check_perceptron(tracker):
         print("To receive full points for this question, your perceptron must converge to 100% accuracy")
         return
 
-    tracker.add_points(4)
+    tracker.add_points(3)
 
-@test('q2', points=6)
+
+def _assert_all_close(hyp, ref, atol, rtol, msg):
+    hyp = np.array(hyp, dtype=np.float64)
+    ref = np.array(ref, dtype=np.float64)
+    is_all_close = np.allclose(hyp, ref, rtol=rtol)
+    abs_err = np.abs(hyp - ref)
+    rel_err = abs_err / (np.abs(ref) + atol)
+    assert is_all_close, msg + f" | Max relative err = {rel_err} | Max absolote err = {abs_err} |"
+
+
+@test('q2', points=2)
+def check_linear(tracker):
+    import nn
+
+    x = nn.Parameter(2, 3)
+    x.data = np.array([
+        [-0.65315968, -0.918132, 0.56587182],
+        [-1.02549346, -0.11568489, 0.02077878]
+    ])
+    w = nn.Parameter(3, 4)
+    w.data = np.array([
+        [-0.08555722, 0.81840331, -0.38684791, 0.76168493],
+        [-0.46757383, -0.867894, 0.29622229, -0.47122592],
+        [0.71762946, 0.51504953, 0.19829121, 0.88721896]
+    ])
+    linear = nn.Linear(x, w)
+    g = np.array([
+        [0.11618675, -0.87726861, 0.21652153, 0.70136728],
+        [1.18046183, 0.5397988, -0.05626107, 0.61637125]
+    ])
+    dx, dw = linear._backward(g, x.data, w.data)
+    dx_ref = np.array([[-0.27744016,  0.44068634,  0.29674291],
+       [ 0.83202126, -1.32755709,  1.66085749]])
+    dw_ref = np.array([[-1.28644439,  0.01943635, -0.08372777, -1.09018951],
+       [-0.24323637,  0.74300182, -0.19228679, -0.71525258],
+       [ 0.09027536, -0.48520522,  0.1213544 ,  0.40969142]])
+    _assert_all_close(dx, dx_ref, 1e-8, 2e-3, "Incorrect downstream gradient for features")
+    _assert_all_close(dw, dw_ref, 1e-8, 2e-3, "Incorrect downstream gradient for weights")
+    tracker.add_points(2)
+
+@test('q3', points=2)
+def check_relu(tracker):
+    import nn
+
+    x = nn.Parameter(2, 3)
+    x.data = np.array(
+        [
+            [-0.65315968, -0.918132, 0.56587182],
+            [-1.02549346, -0.11568489, 0.02077878]
+        ]
+    )
+    relu = nn.ReLU(x)
+    g = np.array([[-0.27744016,  0.44068634,  0.29674291],
+       [ 0.83202126, -1.32755709,  1.66085749]])
+    dx = relu._backward(g, x.data)
+    dx_ref = np.array([
+        [0.0, 0.0, 0.29674291],
+        [0.0, 0.0, 1.66085749]
+    ])
+    _assert_all_close(dx, dx_ref, 1e-8, 2e-3, "Incorrect downstream gradient for features")
+    tracker.add_points(2)
+
+@test('q4', points=2)
+def check_square_loss(tracker):
+    import nn
+
+    a = nn.Parameter(2, 3)
+    a.data = np.array(
+        [
+            [-0.65315968, -0.918132, 0.56587182],
+            [-1.02549346, -0.11568489, 0.02077878]
+        ]
+    )
+    b = nn.Parameter(2, 3)
+    b.data = np.array(
+        [
+            [-0.27744016,  0.44068634,  0.29674291],
+            [ 0.83202126, -1.32755709,  1.66085749]
+        ]
+    )
+    g = 0.11618675
+    square_loss = nn.SquareLoss(a, b)
+    da, db = square_loss._backward(g, a.data, b.data)
+    da_ref = np.array([[-0.0072756 , -0.02631278,  0.00521154],
+       [-0.03596977,  0.02346725, -0.03175924]])
+    db_ref = np.array([[ 0.0072756 ,  0.02631278, -0.00521154],
+       [ 0.03596977, -0.02346725,  0.03175924]])
+    _assert_all_close(da, da_ref, 1e-8, 2e-3, "Incorrect downstream gradient for a")
+    _assert_all_close(db, db_ref, 1e-8, 2e-3, "Incorrect downstream gradient for b")
+    tracker.add_points(2)
+
+
+@test('q5', points=3)
+def check_softmax_loss(tracker):
+    import nn
+
+    p = nn.Parameter(2, 3)
+    p.data = np.array(
+        [
+            [-0.65315968, -0.918132, 0.56587182],
+            [-1.02549346, -0.11568489, 0.02077878]
+        ]
+    )
+    y = nn.Parameter(2, 3)
+    y.data = np.array(
+        [
+            [0.5, 0.25, 0.25],
+            [0.3, 0.4, 0.3]
+        ]
+    )
+    softmax_loss = nn.SoftmaxLoss(p, y)
+    g = 0.19980227
+    dp, dy = softmax_loss._backward(g, p.data, y.data)
+    dp_ref = np.array([[-0.03055657, -0.01009568,  0.04065225],
+       [-0.01419033, -0.00076532,  0.01495564]])
+    dy_ref = np.array([[0.16375967, 0.1902307 , 0.04197704],
+       [0.18436124, 0.09347033, 0.07983746]])
+    _assert_all_close(dp, dp_ref, 1e-8, 2e-3, "Incorrect downstream gradient for logits")
+    _assert_all_close(dy, dy_ref, 1e-8, 2e-3, "Incorrect downstream gradient for labels")
+    tracker.add_points(3)
+
+
+@test('q6', points=5)
 def check_regression(tracker):
     import models
     model = models.RegressionModel()
@@ -463,11 +585,11 @@ def check_regression(tracker):
     loss_threshold = 0.02
     if train_loss <= loss_threshold:
         print("Your final loss is: {:f}".format(train_loss))
-        tracker.add_points(4)
+        tracker.add_points(3)
     else:
         print("Your final loss ({:f}) must be no more than {:.4f} to receive full points for this question".format(train_loss, loss_threshold))
 
-@test('q3', points=6)
+@test('q7', points=5)
 def check_digit_classification(tracker):
     import models
     model = models.DigitClassificationModel()
@@ -513,11 +635,11 @@ def check_digit_classification(tracker):
     accuracy_threshold = 0.97
     if test_accuracy >= accuracy_threshold:
         print("Your final test set accuracy is: {:%}".format(test_accuracy))
-        tracker.add_points(4)
+        tracker.add_points(3)
     else:
         print("Your final test set accuracy ({:%}) must be at least {:.0%} to receive full points for this question".format(test_accuracy, accuracy_threshold))
 
-@test('q4', points=7)
+@test('q8', points=6)
 def check_lang_id(tracker):
     import models
     model = models.LanguageIDModel()
@@ -571,7 +693,7 @@ def check_lang_id(tracker):
     accuracy_threshold = 0.81
     if test_accuracy >= accuracy_threshold:
         print("Your final test set accuracy is: {:%}".format(test_accuracy))
-        tracker.add_points(5)
+        tracker.add_points(4)
     else:
         print("Your final test set accuracy ({:%}) must be at least {:.0%} to receive full points for this question".format(test_accuracy, accuracy_threshold))
 
