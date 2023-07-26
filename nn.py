@@ -212,7 +212,7 @@ class Linear(FunctionNode):
             "Second dimension of first input should match first dimension of "
             "second input, instead got shapes {} and {}".format(
                 format_shape(inputs[0].shape), format_shape(inputs[1].shape)))
-        return np.dot(inputs[0], inputs[1])
+        return np.dot(inputs[0], inputs[1])  # matrix multiplication of `features` and `weights`
 
     @staticmethod
     def _backward(gradient, *inputs):
@@ -240,6 +240,12 @@ class ReLU(FunctionNode):
 
     @staticmethod
     def _backward(gradient, *inputs):
+        """
+        Hint: The following NumPy functions could help:
+
+        - np.heaviside: https://numpy.org/doc/stable/reference/generated/numpy.heaviside.html
+        - np.where: https://numpy.org/doc/stable/reference/generated/numpy.where.html
+        """
         assert gradient.shape == inputs[0].shape
         "*** YOUR CODE HERE (Q3) ***"
 
@@ -292,6 +298,16 @@ class SoftmaxLoss(FunctionNode):
     """
     @staticmethod
     def log_softmax(logits):
+        """
+        A numerically stable version for log(softmax(logits))
+        Input:
+            logits: an array with shape (batch_size x num_classes)
+        Output: an array with the same shape as the input, where each value at a
+            specific location is the log of the softmax value computed for the corresponding logit from the input.
+            output[i, j] = logits[i, j] - log(sum(exp(logits[i, k]), k = 1 .. num_classes))
+                         = log(exp(logits[i, j]) / sum(exp(logits[i, k]), k = 1 .. num_classes))
+                         = log(softmax(logits))
+        """
         log_probs = logits - np.max(logits, axis=1, keepdims=True)
         log_probs -= np.log(np.sum(np.exp(log_probs), axis=1, keepdims=True))
         return log_probs
@@ -318,7 +334,7 @@ class SoftmaxLoss(FunctionNode):
     @staticmethod
     def _backward(gradient, *inputs):
         assert np.asarray(gradient).ndim == 0
-        log_probs = SoftmaxLoss.log_softmax(inputs[0])
+        log_probs = SoftmaxLoss.log_softmax(inputs[0])  # may be helpful
         "*** YOUR CODE HERE (Q5) ***"
 
 def gradients(loss, parameters):
