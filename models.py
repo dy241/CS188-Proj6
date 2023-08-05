@@ -26,7 +26,7 @@ class PerceptronModel(object):
             x: a node with shape (1 x dimensions)
         Returns: a node containing a single number (the score)
         """
-        "*** YOUR CODE HERE ***"
+        return nn.DotProduct(x, self.w)
 
     def get_prediction(self, x):
         """
@@ -34,13 +34,22 @@ class PerceptronModel(object):
 
         Returns: 1 or -1
         """
-        "*** YOUR CODE HERE ***"
+        return 2 * (nn.as_scalar(self.run(x)) >= 0) - 1
 
     def train(self, dataset):
         """
         Train the perceptron until convergence.
         """
-        "*** YOUR CODE HERE ***"
+        while True:
+            errors = 0
+            for x, y in dataset.iterate_once(1):
+                p = self.get_prediction(x)
+                s = nn.as_scalar(y)
+                if p != s:
+                    errors += 1
+                    (self.w).update(x, s)
+            if errors == 0:
+                break
 
 class RegressionModel(object):
     """
@@ -50,7 +59,12 @@ class RegressionModel(object):
     """
     def __init__(self):
         # Initialize your model parameters here
-        "*** YOUR CODE HERE ***"
+        self.lr = 0.05
+        self.bs = 200
+        self.m1 = nn.Parameter(1, 512) # shape x by 512
+        self.b1 = nn.Parameter(1, 512)
+        self.b2 = nn.Parameter(1, 1)
+        self.m3 = nn.Parameter(512, 1)
 
     def run(self, x):
         """
@@ -61,7 +75,13 @@ class RegressionModel(object):
         Returns:
             A node with shape (batch_size x 1) containing predicted y-values
         """
-        "*** YOUR CODE HERE ***"
+        #x--->m1 --->ReLU--->m2--->pred
+        a = nn.Linear(x, self.m1)
+        b = nn.AddBias(a, self.b1)
+        c = nn.ReLU(b)
+        d = nn.Linear(c, self.m3)
+        pred = nn.AddBias(d, self.b2)
+        return pred
 
     def get_loss(self, x, y):
         """
@@ -73,13 +93,26 @@ class RegressionModel(object):
                 to be used for training
         Returns: a loss node
         """
-        "*** YOUR CODE HERE ***"
+        return nn.SquareLoss(self.run(x), y)
 
     def train(self, dataset):
         """
         Trains the model.
         """
-        "*** YOUR CODE HERE ***"
+        i = 0
+        for x, y in dataset.iterate_forever(self.bs):
+            i += 1
+            gradm1, gradm3, gradb1, gradb2 = nn.gradients(self.get_loss(x, y), [self.m1, self.m3, self.b1, self.b2])
+            multiplier = self.lr
+            self.m1.update(gradm1, -multiplier)
+            self.m3.update(gradm3, -multiplier)
+            self.b1.update(gradb1, -multiplier)
+            self.b2.update(gradb2, -multiplier)
+            acc = nn.as_scalar(self.get_loss(x, y))
+            if i % 100 == 0:
+                print(acc)
+            if acc < 0.02:
+                break
 
 class DigitClassificationModel(object):
     """

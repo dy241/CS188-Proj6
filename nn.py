@@ -216,9 +216,15 @@ class Linear(FunctionNode):
 
     @staticmethod
     def _backward(gradient, *inputs):
-        assert gradient.shape[0] == inputs[0].shape[0]
-        assert gradient.shape[1] == inputs[1].shape[1]
+        assert gradient.shape[0] == inputs[0].shape[0] ##features f(x)
+        assert gradient.shape[1] == inputs[1].shape[1] #Weights w
+        ##output z
+        gradfeats = np.dot(gradient, inputs[1].T)
+        gradweights = np.dot(inputs[0].T, gradient)
+        return (gradfeats, gradweights)
         "*** YOUR CODE HERE (Q2) ***"
+
+        
 
 class ReLU(FunctionNode):
     """
@@ -246,9 +252,10 @@ class ReLU(FunctionNode):
         - np.heaviside: https://numpy.org/doc/stable/reference/generated/numpy.heaviside.html
         - np.where: https://numpy.org/doc/stable/reference/generated/numpy.where.html
         """
-        assert gradient.shape == inputs[0].shape
-        "*** YOUR CODE HERE (Q3) ***"
 
+        assert gradient.shape == inputs[0].shape
+        return [np.where(inputs[0] > 0, gradient, 0)]
+    
 class SquareLoss(FunctionNode):
     """
     This node first computes 0.5 * (a[i,j] - b[i,j])**2 at all positions (i,j)
@@ -278,7 +285,16 @@ class SquareLoss(FunctionNode):
     @staticmethod
     def _backward(gradient, *inputs):
         assert np.asarray(gradient).ndim == 0
-        "*** YOUR CODE HERE (Q4) ***"
+        
+        size = inputs[0].shape[0] * inputs[0].shape[1]
+        grad_a = gradient * (inputs[0]-inputs[1])/size
+        grad_b = gradient * -(inputs[0]-inputs[1])/size
+    
+        return [grad_a,grad_b]
+
+
+
+
 
 class SoftmaxLoss(FunctionNode):
     """
@@ -334,8 +350,22 @@ class SoftmaxLoss(FunctionNode):
     @staticmethod
     def _backward(gradient, *inputs):
         assert np.asarray(gradient).ndim == 0
-        log_probs = SoftmaxLoss.log_softmax(inputs[0])  # may be helpful
-        "*** YOUR CODE HERE (Q5) ***"
+        logits = inputs[0]
+        labels = inputs[1]
+        size = logits.shape[0]
+        
+        # Compute the softmax
+        exp_logits = np.exp(logits - np.max(logits, axis=-1, keepdims=True))
+        softmax = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+
+        # Compute the gradient w.r.t. logits
+        grad_logits = gradient * (softmax - labels) / size
+
+        # Compute the gradient w.r.t. labels
+        log_probs = SoftmaxLoss.log_softmax(logits)
+        grad_labels = gradient * -log_probs / size
+        print([grad_logits, grad_labels])
+        return [grad_logits, grad_labels]
 
 def gradients(loss, parameters):
     """
