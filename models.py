@@ -130,7 +130,13 @@ class DigitClassificationModel(object):
     """
     def __init__(self):
         # Initialize your model parameters here
-        "*** YOUR CODE HERE ***"
+        self.lr = 0.5
+        self.bs = 100
+        self.m1 = nn.Parameter(784, 200) # shape x by 512
+        self.b1 = nn.Parameter(1, 200)
+        self.m3 = nn.Parameter(200, 10)
+        self.b2 = nn.Parameter(1, 10)
+        
 
     def run(self, x):
         """
@@ -146,7 +152,12 @@ class DigitClassificationModel(object):
             A node with shape (batch_size x 10) containing predicted scores
                 (also called logits)
         """
-        "*** YOUR CODE HERE ***"
+        a = nn.Linear(x, self.m1)
+        b = nn.AddBias(a, self.b1)
+        c = nn.ReLU(b)
+        d = nn.Linear(c, self.m3)
+        pred = nn.AddBias(d, self.b2)
+        return pred
 
     def get_loss(self, x, y):
         """
@@ -161,13 +172,28 @@ class DigitClassificationModel(object):
             y: a node with shape (batch_size x 10)
         Returns: a loss node
         """
-        "*** YOUR CODE HERE ***"
+        return nn.SoftmaxLoss(self.run(x), y)
 
     def train(self, dataset):
         """
         Trains the model.
         """
-        "*** YOUR CODE HERE ***"
+        i = 0
+        for x, y in dataset.iterate_forever(self.bs):
+            i += 1
+            gradm1, gradm3, gradb1, gradb2 = nn.gradients(self.get_loss(x, y), [self.m1, self.m3, self.b1, self.b2])
+            multiplier = self.lr
+            self.m1.update(gradm1, -multiplier)
+            self.m3.update(gradm3, -multiplier)
+            self.b1.update(gradb1, -multiplier)
+            self.b2.update(gradb2, -multiplier)
+            acc = dataset.get_validation_accuracy()
+            if i % 100 == 0:
+                print(acc)
+            if acc > 0.98:
+                break
+        
+
 
 class LanguageIDModel(object):
     """
@@ -186,7 +212,15 @@ class LanguageIDModel(object):
         self.languages = ["English", "Spanish", "Finnish", "Dutch", "Polish"]
 
         # Initialize your model parameters here
-        "*** YOUR CODE HERE ***"
+        self.lr = 0.3
+        self.bs = 200
+        self.m1 = nn.Parameter(self.num_chars, 200)
+        self.m2 = nn.Parameter(200, len(self.languages))
+        self.m3 = nn.Parameter(200, 200)
+        self.m4 = nn.Parameter(len(self.languages), 200)
+        self.b1 = nn.Parameter(1, 200)
+        self.b2 = nn.Parameter(1, len(self.languages))
+        self.b3 = nn.Parameter(1, 200)
 
     def run(self, xs):
         """
@@ -217,7 +251,28 @@ class LanguageIDModel(object):
             A node with shape (batch_size x 5) containing predicted scores
                 (also called logits)
         """
-        "*** YOUR CODE HERE ***"
+        #[[[c],[b],[h]][[a],[a],[a]][[t],[t],[t]]]
+        x = xs[0] # first characters
+        x = nn.Linear(x, self.m1)
+        x = nn.AddBias(x, self.b1)
+        x = nn.ReLU(x)
+        x = nn.Linear(x, self.m3)
+        x = nn.AddBias(x, self.b3)
+        x = nn.ReLU(x)
+        x = nn.Linear(x, self.m2)
+        h = nn.AddBias(x, self.b2)
+
+        for i in range(1, len(xs)):
+            x = xs[i]
+            x = nn.Linear(x, self.m1)
+            h = nn.Linear(h, self.m4)
+            x = nn.Add(h, x)
+            x = nn.AddBias(x, self.b1)
+            x = nn.ReLU(x)
+            x = nn.Linear(x, self.m2)
+            h = nn.AddBias(x, self.b2)
+
+        return h
 
     def get_loss(self, xs, y):
         """
@@ -233,10 +288,27 @@ class LanguageIDModel(object):
             y: a node with shape (batch_size x 5)
         Returns: a loss node
         """
-        "*** YOUR CODE HERE ***"
+        return nn.SoftmaxLoss(self.run(xs), y)
 
     def train(self, dataset):
         """
         Trains the model.
         """
-        "*** YOUR CODE HERE ***"
+        i = 0
+        for xs, y in dataset.iterate_forever(self.bs):
+            i += 1
+            gradm1, gradm2, gradm3, gradm4, gradb1, gradb2, gradb3 = nn.gradients( \
+                self.get_loss(xs, y), [self.m1, self.m2, self.m3, self.m4, self.b1, self.b2, self.b3])
+            multiplier = self.lr/(i**0.3)
+            self.m1.update(gradm1, -multiplier)
+            self.m2.update(gradm2, -multiplier)
+            self.m3.update(gradm3, -multiplier)
+            self.m4.update(gradm4, -multiplier)
+            self.b1.update(gradb1, -multiplier)
+            self.b2.update(gradb2, -multiplier)
+            self.b3.update(gradb3, -multiplier)
+            acc = dataset.get_validation_accuracy()
+            if (i % 100 == 0):
+                print("\n" + str(i) + ": " + str(multiplier) + "\n")
+            if acc > 0.84:
+                break

@@ -364,7 +364,6 @@ class SoftmaxLoss(FunctionNode):
         # Compute the gradient w.r.t. labels
         log_probs = SoftmaxLoss.log_softmax(logits)
         grad_labels = gradient * -log_probs / size
-        print([grad_logits, grad_labels])
         return [grad_logits, grad_labels]
 
 def gradients(loss, parameters):
